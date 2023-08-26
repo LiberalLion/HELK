@@ -51,7 +51,7 @@ args = parser.parse_args()
 if args.version:
     print("script version 0.1")
 if args.rules_directory:
-    SIGMARULES = "{}**/*.yml".format(args.rules_directory)
+    SIGMARULES = f"{args.rules_directory}**/*.yml"
 if args.field_mappings_config:
     FIELDMAPPINGSCONFIG = args.field_mappings_config
 if args.es_url:
@@ -67,7 +67,7 @@ if args.es_password:
 SIGMACTARGET = "es-qs"
 
 # Reading field Mappings
-print("[+] Reading index and field mappings from {}..".format(FIELDMAPPINGSCONFIG))
+print(f"[+] Reading index and field mappings from {FIELDMAPPINGSCONFIG}..")
 FIELDMAPPINGSDICT = yaml.safe_load(open(FIELDMAPPINGSCONFIG).read())
 
 # ******* Transforming every sigma rule to specific backend *******
@@ -79,13 +79,22 @@ actualCounter=0
 sigmaFiles = glob.glob(SIGMARULES, recursive=True)
 for sfile in sigmaFiles:
     originalCounter += 1
-    print("  [>] Processing {} rule".format(sfile))
+    print(f"  [>] Processing {sfile} rule")
     try:
         rule = list(yaml.safe_load_all(open(sfile).read()))
     except yaml.YAMLError as e:
-        print("  [!!] Script could not parse the yaml contents of {} and failed with the following error: {}".format(sfile, e))
+        print(
+            f"  [!!] Script could not parse the yaml contents of {sfile} and failed with the following error: {e}"
+        )
     # Testing if sigmac can translate sigma rule.
-    sigmacCommand = ["sigmac", "-t", SIGMACTARGET, "-c", FIELDMAPPINGSCONFIG, "{}".format(sfile)]
+    sigmacCommand = [
+        "sigmac",
+        "-t",
+        SIGMACTARGET,
+        "-c",
+        FIELDMAPPINGSCONFIG,
+        f"{sfile}",
+    ]
     p = subprocess.run(sigmacCommand, stdout=subprocess.PIPE, text=True)
     detection = p.stdout.splitlines()
     # If there is an error translating rule, loop moves to the next iteration
@@ -103,20 +112,22 @@ for sfile in sigmaFiles:
         category = None
     if None not in (product, service):
         try:
-            ESINDEX = FIELDMAPPINGSDICT['logsources']['{}-{}'.format(product, service)]['index']
+            ESINDEX = FIELDMAPPINGSDICT['logsources'][f'{product}-{service}']['index']
         except:
-            print(    "    [!!] {} does not have pre-defined indices for this product and service..".format(FIELDMAPPINGSCONFIG))
+            print(
+                f"    [!!] {FIELDMAPPINGSCONFIG} does not have pre-defined indices for this product and service.."
+            )
             ESINDEX = DEFAULTESINDEX
     else:
         ESINDEX = DEFAULTESINDEX
-    print(    "    [++] Setting Elasticsearch index to {}".format(ESINDEX))
+    print(f"    [++] Setting Elasticsearch index to {ESINDEX}")
     # ********* Creating Jupyter Notebook *************
     # Extracting field values
     TITLE = rule[0]['title']
     DESCRIPTION = rule[0]['description']
     RULE_CONTENT = yaml.dump(rule, sort_keys=False)
     # Initializing Notebooks Cells
-    nb = nbf.v4.new_notebook() 
+    nb = nbf.v4.new_notebook()
     nb['cells'] = []
     # *** TITLE & DESCRIPTION****
     nb['cells'].append(nbf.v4.new_markdown_cell("""# {}
@@ -154,10 +165,12 @@ if response.success():
     nb['cells'].append(nbf.v4.new_code_cell("df.head()"))
     # writing to Jupyter Notebook
     filename = path.splitext(path.basename(sfile))[0]
-    notebookPath = "{}{}.ipynb".format(NOTEBOOKSPATH,filename)
-    print(    "    [++] writing sigma rule to jupyter notebook {}".format(notebookPath))
+    notebookPath = f"{NOTEBOOKSPATH}{filename}.ipynb"
+    print(f"    [++] writing sigma rule to jupyter notebook {notebookPath}")
     nbf.write(nb, notebookPath)
     actualCounter += 1
 
 timeTaken = time.time() - start_time
-print("\n--- {} out of {} sigma rules were turned into notebooks in {} seconds ---".format(actualCounter, originalCounter, timeTaken))
+print(
+    f"\n--- {actualCounter} out of {originalCounter} sigma rules were turned into notebooks in {timeTaken} seconds ---"
+)
